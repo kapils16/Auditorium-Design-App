@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resonate: Auditorium Section Optimizer</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-color: #2a2a2a;
+            --text-color: #e0e0e0;
+            --accent-color: #4CAF50;
+            --danger-color: #ff5252;
+            --math-font: 'Times New Roman', serif;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- SIDEBAR CONTROLS --- */
+        #sidebar {
+            width: 320px; /* Slightly wider to fit formula */
+            background-color: var(--panel-color);
+            padding: 20px;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.5);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            border-bottom: 2px solid var(--accent-color);
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: #aaa;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+            accent-color: var(--accent-color);
+        }
+
+        input[type="number"] {
+            background: #333;
+            border: 1px solid #444;
+            color: white;
+            padding: 4px;
+            width: 60px;
+            border-radius: 4px;
+        }
+
+        .value-display {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        /* --- STATS PANEL --- */
+        #stats {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .warning {
+            color: var(--danger-color);
+            font-weight: bold;
+            display: none;
+            margin-top: 5px;
+        }
+
+        /* --- FORMULA PANEL (NEW) --- */
+        #formula-panel {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 12px;
+            margin-top: 10px;
+        }
+
+        .formula-title {
+            font-size: 0.85rem;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 5px;
+        }
+
+        .math-equation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--math-font);
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            font-style: italic;
+        }
+
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0 8px;
+            vertical-align: middle;
+        }
+
+        .numerator {
+            border-bottom: 1px solid var(--text-color);
+            padding-bottom: 2px;
+            margin-bottom: 2px;
+            text-align: center;
+        }
+
+        .denominator {
+            text-align: center;
+        }
+
+        .var-list {
+            font-size: 0.75rem;
+            color: #bbb;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 4px 10px;
+        }
+
+        .var-symbol {
+            font-family: var(--math-font);
+            font-style: italic;
+            color: var(--accent-color);
+            font-weight: bold;
+            text-align: right;
+        }
+
+        /* --- MAIN CANVAS --- */
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+            cursor: grab;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.8rem;
+            margin-bottom: 4px;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="sidebar">
+        <h2>Rake Calculator</h2>
+
+        <div class="control-group">
+            <label>Capacity (Rows) <span id="val-rows" class="value-display">20</span></label>
+            <input type="range" id="inp-rows" min="5" max="50" value="20">
+        </div>
+
+        <div class="control-group">
+            <label>Row Depth (m) <span id="val-depth" class="value-display">1.0</span></label>
+            <input type="range" id="inp-depth" min="0.8" max="1.5" step="0.05" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <label>First Row Dist (m) <span id="val-dist" class="value-display">3.5</span></label>
+            <input type="range" id="inp-dist" min="2.0" max="10.0" step="0.1" value="3.5">
+        </div>
+
+        <div class="control-group">
+            <label>Stage Height (m) <span id="val-stage" class="value-display">0.9</span></label>
+            <input type="range" id="inp-stage" min="0.0" max="2.0" step="0.1" value="0.9">
+        </div>
+
+        <div class="control-group">
+            <label>C-Value (Sightline) <span id="val-c" class="value-display">120 mm</span></label>
+            <input type="range" id="inp-c" min="60" max="150" step="5" value="120">
+        </div>
+
+        <div id="stats">
+            <div class="stat-row"><span>Total Length:</span> <span id="stat-len">0 m</span></div>
+            <div class="stat-row"><span>Total Height:</span> <span id="stat-height">0 m</span></div>
+            <div class="stat-row"><span>Max Rake Angle:</span> <span id="stat-angle">0°</span></div>
+            <div id="warn-steep" class="warning">⚠️ WARNING: Too Steep (>30°)</div>
+        </div>
+
+        <div id="formula-panel">
+            <div class="formula-title">Calculation Reference</div>
+            
+            <div class="math-equation">
+                <span>Y<sub>next</sub> = F + </span>
+                <div class="fraction">
+                    <span class="numerator">D<sub>next</sub> &middot; (Y<sub>prev</sub> + C - F)</span>
+                    <span class="denominator">D<sub>prev</sub></span>
+                </div>
+            </div>
+
+            <div class="var-list">
+                <span class="var-symbol">Y<sub>next</sub></span>
+                <span>Eye height (current row)</span>
+                
+                <span class="var-symbol">Y<sub>prev</sub></span>
+                <span>Eye height (previous row)</span>
+                
+                <span class="var-symbol">D<sub>next</sub></span>
+                <span>Dist. Focus to current row</span>
+                
+                <span class="var-symbol">D<sub>prev</sub></span>
+                <span>Dist. Focus to previous row</span>
+                
+                <span class="var-symbol">C</span>
+                <span>C-Value (Clearance)</span>
+                
+                <span class="var-symbol">F</span>
+                <span>Focal Point Height (Stage)</span>
+            </div>
+        </div>
+        <div style="margin-top:auto; font-size:0.75rem; color:#666;">
+            Scroll to Zoom • Drag to Pan<br>
+            <span style="color: #4CAF50">©Kapil Sinha</span>
+        </div>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+        <div id="legend">
+            <div class="legend-item">
+                <div class="dot" style="background:#4CAF50"></div> Sightlines
+            </div>
+            <div class="legend-item">
+                <div class="dot" style="background:#2196F3"></div> Riser Structure
+            </div>
+            <div class="legend-item">
+                <div class="dot" style="background:#FF5252"></div> Focal Point
+            </div>
+            <div class="legend-item">
+                <div class="dot" style="background:#aaa"></div> Elevations
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIGURATION & STATE ---
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+
+        let params = {
+            rows: 20,
+            depth: 1.0,
+            firstDist: 3.5,
+            stageHeight: 0.9,
+            cValue: 0.12,
+            eyeHeight: 1.2,
+            startFloor: 0.0
+        };
+
+        let view = {
+            scale: 40,
+            offsetX: 100,
+            offsetY: 0
+        };
+
+        const inputs = {
+            rows: document.getElementById('inp-rows'),
+            depth: document.getElementById('inp-depth'),
+            dist: document.getElementById('inp-dist'),
+            stage: document.getElementById('inp-stage'),
+            c: document.getElementById('inp-c')
+        };
+        const displays = {
+            rows: document.getElementById('val-rows'),
+            depth: document.getElementById('val-depth'),
+            dist: document.getElementById('val-dist'),
+            stage: document.getElementById('val-stage'),
+            c: document.getElementById('val-c')
+        };
+        const stats = {
+            len: document.getElementById('stat-len'),
+            height: document.getElementById('stat-height'),
+            angle: document.getElementById('stat-angle'),
+            warn: document.getElementById('warn-steep')
+        };
+
+        // --- MATH ENGINE ---
+        function calculateSection() {
+            let profile = [];
+            const focus = { x: 0, y: params.stageHeight };
+            let prevX = params.firstDist;
+            let prevY = params.startFloor + params.eyeHeight;
+
+            profile.push({
+                id: 1,
+                x: params.firstDist,
+                floorY: params.startFloor,
+                eyeY: prevY
+            });
+
+            let maxAngle = 0;
+
+            for (let i = 2; i <= params.rows; i++) {
+                let currX = params.firstDist + ((i - 1) * params.depth);
+                
+                // This logic matches your formula:
+                // slope = (Y_prev + C - F) / D_prev
+                // currEyeY (Y_next) = F + slope * D_next
+                let slope = (prevY + params.cValue - focus.y) / prevX;
+                let currEyeY = focus.y + (slope * currX);
+                
+                let currFloorY = currEyeY - params.eyeHeight;
+
+                let rise = currFloorY - profile[i - 2].floorY;
+                let run = params.depth;
+                let angle = Math.atan(rise / run) * (180 / Math.PI);
+                if (angle > maxAngle) maxAngle = angle;
+
+                profile.push({
+                    id: i,
+                    x: currX,
+                    floorY: currFloorY,
+                    eyeY: currEyeY
+                });
+
+                prevX = currX;
+                prevY = currEyeY;
+            }
+            return { profile, focus, maxAngle };
+        }
+
+        // --- RENDER ENGINE ---
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const data = calculateSection();
+            const prof = data.profile;
+
+            const toScreen = (x, y) => {
+                return {
+                    x: view.offsetX + (x * view.scale),
+                    y: canvas.height - view.offsetY - (y * view.scale)
+                };
+            };
+
+            // 1. DRAW STAGE
+            const stageTop = toScreen(0, params.stageHeight);
+            const stageBase = toScreen(0, 0);
+            const stageFront = toScreen(-4, 0);
+
+            ctx.fillStyle = '#442222';
+            ctx.beginPath();
+            ctx.moveTo(stageFront.x, stageTop.y);
+            ctx.lineTo(stageTop.x, stageTop.y);
+            ctx.lineTo(stageTop.x, stageBase.y);
+            ctx.lineTo(stageFront.x, stageBase.y);
+            ctx.fill();
+
+            ctx.fillStyle = '#FF5252';
+            ctx.beginPath();
+            ctx.arc(stageTop.x, stageTop.y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 2. DRAW RISERS
+            ctx.fillStyle = '#2196F3';
+            ctx.strokeStyle = '#64b5f6';
+            ctx.lineWidth = 1;
+
+            ctx.beginPath();
+            let start = toScreen(prof[0].x - 0.2, 0);
+            ctx.moveTo(start.x, start.y);
+
+            prof.forEach((row, idx) => {
+                let pBack = toScreen(row.x + params.depth, row.floorY);
+                let stepFront = toScreen(row.x, row.floorY);
+                if (idx > 0) {
+                    ctx.lineTo(stepFront.x, stepFront.y);
+                } else {
+                    ctx.lineTo(stepFront.x, stepFront.y);
+                }
+                ctx.lineTo(pBack.x, pBack.y);
+            });
+
+            let last = prof[prof.length - 1];
+            let groundRight = toScreen(last.x + params.depth, 0);
+            ctx.lineTo(groundRight.x, groundRight.y);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // 3. DRAW ELEVATION LABELS
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+            ctx.font = '11px monospace';
+            ctx.textAlign = "left";
+
+            if (view.scale > 15) {
+                prof.forEach(row => {
+                    let pFloor = toScreen(row.x, row.floorY);
+                    let label = "+" + row.floorY.toFixed(2);
+                    ctx.fillText(label, pFloor.x + 4, pFloor.y - 6);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                    ctx.beginPath();
+                    ctx.moveTo(pFloor.x, pFloor.y);
+                    ctx.lineTo(pFloor.x, pFloor.y - 4);
+                    ctx.stroke();
+                });
+            }
+
+            // 4. DRAW SIGHTLINES
+            prof.forEach(row => {
+                let pEye = toScreen(row.x, row.eyeY);
+                let pFocus = toScreen(data.focus.x, data.focus.y);
+
+                ctx.fillStyle = '#eee';
+                ctx.beginPath();
+                ctx.arc(pEye.x, pEye.y, 3, 0, Math.PI * 2);
+                ctx.fill();
+
+                let pFloor = toScreen(row.x, row.floorY);
+                ctx.strokeStyle = '#aaa';
+                ctx.beginPath();
+                ctx.moveTo(pEye.x, pEye.y + 3);
+                ctx.lineTo(pFloor.x, pFloor.y);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+                ctx.beginPath();
+                ctx.moveTo(pEye.x, pEye.y);
+                ctx.lineTo(pFocus.x, pFocus.y);
+                ctx.stroke();
+            });
+
+            // STATS UPDATE
+            let lastRow = prof[prof.length - 1];
+            stats.len.innerText = (lastRow.x + params.depth).toFixed(2) + " m";
+            stats.height.innerText = lastRow.floorY.toFixed(2) + " m";
+            stats.angle.innerText = data.maxAngle.toFixed(1) + "°";
+            stats.warn.style.display = data.maxAngle > 30 ? 'block' : 'none';
+        }
+
+        // --- INTERACTION ---
+        function updateParams() {
+            params.rows = parseInt(inputs.rows.value);
+            params.depth = parseFloat(inputs.depth.value);
+            params.firstDist = parseFloat(inputs.dist.value);
+            params.stageHeight = parseFloat(inputs.stage.value);
+            params.cValue = parseInt(inputs.c.value) / 1000;
+
+            displays.rows.innerText = params.rows;
+            displays.depth.innerText = params.depth.toFixed(2);
+            displays.dist.innerText = params.firstDist.toFixed(1);
+            displays.stage.innerText = params.stageHeight.toFixed(1);
+            displays.c.innerText = inputs.c.value + " mm";
+            draw();
+        }
+
+        let isDragging = false;
+        let lastMouse = { x: 0, y: 0 };
+
+        canvas.addEventListener('mousedown', e => { isDragging = true; lastMouse = { x: e.clientX, y: e.clientY }; container.style.cursor = 'grabbing'; });
+        window.addEventListener('mouseup', () => { isDragging = false; container.style.cursor = 'grab'; });
+        window.addEventListener('mousemove', e => {
+            if (!isDragging) return;
+            let dx = e.clientX - lastMouse.x;
+            let dy = e.clientY - lastMouse.y;
+            view.offsetX += dx;
+            view.offsetY -= dy;
+            lastMouse = { x: e.clientX, y: e.clientY };
+            draw();
+        });
+        canvas.addEventListener('wheel', e => {
+            e.preventDefault();
+            const zoomSpeed = 0.001;
+            view.scale += e.deltaY * -zoomSpeed * 5;
+            view.scale = Math.max(5, Math.min(view.scale, 200));
+            draw();
+        }, { passive: false });
+
+        Object.values(inputs).forEach(inp => inp.addEventListener('input', updateParams));
+        function resize() {
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+            view.offsetY = 50;
+            draw();
+        }
+        window.addEventListener('resize', resize);
+        resize();
+        updateParams();
+    </script>
+</body>
+
+</html>

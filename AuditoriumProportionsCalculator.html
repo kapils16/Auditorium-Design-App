@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resonate: Auditorium Proportions Calculator</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --panel-color: #1e1e1e;
+            --grid-line: rgba(255,255,255,0.05);
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent-green: #4CAF50;
+            --accent-blue: #2196F3;
+            --accent-red: #ff5252;
+            --accent-amber: #ffca28;
+            --border-color: #333333;
+        }
+
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color); color: var(--text-main);
+            display: flex; overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        #sidebar {
+            width: 320px; min-width: 320px;
+            background-color: var(--panel-color);
+            padding: 20px;
+            border-right: 1px solid var(--border-color);
+            display: flex; flex-direction: column; gap: 20px;
+            box-shadow: 4px 0 15px rgba(0,0,0,0.4); z-index: 10;
+        }
+
+        h2 {
+            margin: 0 0 10px 0; font-size: 1.2rem; font-weight: 600;
+            border-bottom: 2px solid var(--accent-green); padding-bottom: 10px;
+        }
+
+        .control-group { display: flex; flex-direction: column; gap: 8px; }
+        .label-row { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--text-muted); }
+        .value-display { color: var(--accent-green); font-weight: bold; }
+
+        input[type="range"] {
+            -webkit-appearance: none; width: 100%; height: 6px;
+            background: #333; border-radius: 3px; outline: none; cursor: pointer;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 18px; height: 18px;
+            background: var(--accent-green); border-radius: 50%; cursor: pointer;
+            border: 2px solid #121212; box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+
+        /* Radio Button Styles */
+        .tool-selector {
+            background: #2a2a2a; padding: 10px; border-radius: 6px; border: 1px solid #444;
+        }
+        .radio-option {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 8px; cursor: pointer; color: #ccc; font-size: 0.9rem;
+        }
+        .radio-option:last-child { margin-bottom: 0; }
+        .radio-option input { accent-color: var(--accent-green); cursor: pointer; }
+
+        /* Stats Panel */
+        .stats-box {
+            background-color: rgba(255,255,255,0.03); border-radius: 6px;
+            padding: 15px; margin-top: auto; border: 1px solid #333;
+        }
+        .stat-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9rem; }
+        .stat-label { color: var(--text-muted); }
+        .stat-val { font-weight: bold; font-family: monospace; font-size: 1rem; }
+
+        /* --- CANVAS --- */
+        #canvas-wrapper {
+            flex-grow: 1; position: relative;
+            background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+            background-size: 40px 40px; cursor: grab; overflow: hidden;
+        }
+        
+        canvas { display: block; width: 100%; height: 100%; }
+
+        #hover-tooltip {
+            position: absolute; top: 0; left: 0;
+            background: rgba(0, 0, 0, 0.85); border: 1px solid var(--accent-green);
+            color: var(--accent-green); padding: 5px 10px; border-radius: 4px;
+            pointer-events: none; font-size: 0.9rem; font-weight: bold;
+            display: none; white-space: nowrap; z-index: 100;
+        }
+
+        #legend {
+            position: absolute; bottom: 20px; right: 20px;
+            background-color: rgba(18, 18, 18, 0.9);
+            border: 1px solid var(--border-color); padding: 15px;
+            border-radius: 6px; font-size: 0.85rem; pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        }
+        .legend-item { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .line-icon { width: 20px; height: 3px; border-radius: 2px; }
+        .hatch-icon { 
+            width: 20px; height: 14px; border: 1px solid #555; 
+            background: repeating-linear-gradient(45deg, transparent, transparent 2px, rgba(255,255,255,0.2) 2px, rgba(255,255,255,0.2) 4px);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <h2>Auditorium Proportions Calculator</h2>
+        
+        <div class="control-group">
+            <div class="label-row">
+                <span>Proscenium Width (m)</span>
+                <span id="val-pros" class="value-display">14.0</span>
+            </div>
+            <input type="range" id="inp-pros" min="8" max="30" step="0.5" value="14">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>Stage Depth (m)</span>
+                <span id="val-depth" class="value-display">10.0</span>
+            </div>
+            <input type="range" id="inp-depth" min="4" max="24" step="0.5" value="10">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <span>'P' Ratio (x times Proscenium Width) </span>
+                <span id="val-ratio" class="value-display">1.0x</span>
+            </div>
+            <input type="range" id="inp-ratio" min="0.5" max="2.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row"><span>Seating Row Overlay</span></div>
+            <div class="tool-selector">
+                <label class="radio-option">
+                    <input type="radio" name="overlay" value="off" checked>
+                    <span>Off</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="overlay" value="arcs">
+                    <span>Row Width (1.2m)</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="stats-box">
+            <div class="stat-item"><span class="stat-label">Calculated Depth (30°):</span><span id="stat-depth" class="stat-val" style="color: var(--accent-red);">0.0 m</span></div>
+            <div class="stat-item"><span class="stat-label">Back Wall Width:</span><span id="stat-width" class="stat-val" style="color: var(--accent-blue);">0.0 m</span></div>
+            <div class="stat-item"><span class="stat-label">First Row Width:</span><span id="stat-width-first" class="stat-val" style="color: #ffcc80;">0.0 m</span></div>
+            
+            <div style="margin: 10px 0; border-top: 1px solid #333;"></div>
+            <div class="stat-item"><span class="stat-label">Seating Area:</span><span id="stat-area" class="stat-val">0 m²</span></div>
+            <div class="stat-item"><span class="stat-label">Est. Capacity:</span><span id="stat-cap" class="stat-val" style="color: var(--accent-green);">0 ppl</span></div>
+            
+            <div style="margin: 10px 0; border-top: 1px solid #333;"></div>
+            <div class="stat-item"><span class="stat-label">First Row Dist:</span><span id="dist-110" class="stat-val">0 m</span></div>
+            <div class="stat-item"><span class="stat-label">Middle Row Dist:</span><span id="dist-60" class="stat-val">0 m</span></div>
+        </div>
+
+        <div class="control-group">
+            <div class="label-row"><span>Mouse Tool</span></div>
+            <div class="tool-selector">
+                <label class="radio-option">
+                    <input type="radio" name="tool" value="nav" checked>
+                    <span>Navigation</span>
+                </label>
+                <label class="radio-option">
+                    <input type="radio" name="tool" value="probe">
+                    <span>Angle Probe</span>
+                </label>
+            </div>
+        </div>
+        
+        <div style="font-size: 0.75rem; color: #555; margin-top: 0px;">Red Straight dashed lines represent rows at optimal center viewing distance. Capacity based on 0.5m²/person.</div>
+        <span style="font-size: 0.75rem; color: #4CAF50">©Kapil Sinha</span>
+    </div>
+
+    <div id="canvas-wrapper">
+        <canvas id="mainCanvas"></canvas>
+        <div id="hover-tooltip">Angle: 0°</div>
+        <div id="legend">
+            <div class="legend-item"><div class="line-icon" style="background: var(--accent-blue);"></div><span>Side Walls</span></div>
+            <div class="legend-item"><div class="line-icon" style="border: 1px dashed var(--accent-red); background: transparent;"></div><span>Straight Rows</span></div>
+            <div class="legend-item"><div class="line-icon" style="border: 1px solid var(--accent-amber); background: transparent;"></div><span>Concentric Rows</span></div>
+            <div class="legend-item"><div class="hatch-icon"></div><span>Stage Blind Spot</span></div>
+            <div class="legend-item"><div class="line-icon" style="background: #fff; border: 1px dashed #fff;"></div><span>Proscenium Line</span></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-wrapper');
+        const tooltip = document.getElementById('hover-tooltip');
+        const toolRadios = document.getElementsByName('tool');
+        const overlayRadios = document.getElementsByName('overlay');
+
+        const state = { 
+            prosWidth: 14.0, 
+            stageDepth: 10.0, 
+            pRatio: 1.0, 
+            scale: 15, 
+            depth30: 0, 
+            dist60: 0, 
+            dist110: 0, 
+            tool: 'nav',
+            overlay: 'off'
+        };
+        const view = { offsetX: 0, offsetY: 0, initialized: false };
+        const mouse = { x: 0, y: 0 };
+        
+        const ui = {
+            pros: document.getElementById('inp-pros'), 
+            depth: document.getElementById('inp-depth'),
+            ratio: document.getElementById('inp-ratio'),
+            valPros: document.getElementById('val-pros'), 
+            valDepth: document.getElementById('val-depth'),
+            valRatio: document.getElementById('val-ratio'),
+            statDepth: document.getElementById('stat-depth'), 
+            statWidth: document.getElementById('stat-width'),
+            statWidthFirst: document.getElementById('stat-width-first'),
+            statArea: document.getElementById('stat-area'),
+            statCap: document.getElementById('stat-cap'),
+            dist60: document.getElementById('dist-60'), 
+            dist110: document.getElementById('dist-110')
+        };
+
+        let hatchPattern = null;
+        function getHatchPattern() {
+            if(hatchPattern) return hatchPattern;
+            const pCan = document.createElement('canvas');
+            pCan.width = 10; pCan.height = 10;
+            const pCtx = pCan.getContext('2d');
+            pCtx.strokeStyle = "rgba(255, 255, 255, 0.15)"; pCtx.lineWidth = 1;
+            pCtx.beginPath(); pCtx.moveTo(0,10); pCtx.lineTo(10,0); pCtx.stroke();
+            hatchPattern = ctx.createPattern(pCan, 'repeat');
+            return hatchPattern;
+        }
+
+        function calcDistForAngle(width, degrees) {
+            return (width / 2) / Math.tan((degrees * Math.PI) / 360);
+        }
+
+        function calcRowHalfWidth(depth, P_Dist, PW) {
+            return (PW / 2) * ((depth + P_Dist) / P_Dist);
+        }
+
+        function updateCalculations() {
+            state.prosWidth = parseFloat(ui.pros.value);
+            state.stageDepth = parseFloat(ui.depth.value);
+            state.pRatio = parseFloat(ui.ratio.value);
+            
+            state.dist110 = calcDistForAngle(state.prosWidth, 110);
+            state.dist60 = calcDistForAngle(state.prosWidth, 60);
+            state.depth30 = calcDistForAngle(state.prosWidth, 30);
+
+            // --- AREA & CAPACITY CALC ---
+            const PW = state.prosWidth;
+            const P_Dist = state.pRatio * PW;
+            
+            const wBack = calcRowHalfWidth(state.depth30, P_Dist, PW) * 2;
+            const wFront = calcRowHalfWidth(state.dist110, P_Dist, PW) * 2;
+            const length = state.depth30 - state.dist110;
+            
+            const area = ((wBack + wFront) / 2) * length;
+            const capacity = area / 0.5;
+
+            // UI Updates
+            ui.valPros.innerText = state.prosWidth.toFixed(1);
+            ui.valDepth.innerText = state.stageDepth.toFixed(1);
+            ui.valRatio.innerText = state.pRatio.toFixed(1) + "x";
+            ui.statDepth.innerText = state.depth30.toFixed(2) + " m";
+            ui.dist60.innerText = state.dist60.toFixed(2) + " m";
+            ui.dist110.innerText = state.dist110.toFixed(2) + " m";
+            
+            // Widths
+            ui.statWidth.innerText = wBack.toFixed(2) + " m";
+            ui.statWidthFirst.innerText = wFront.toFixed(2) + " m";
+
+            ui.statArea.innerText = area.toFixed(1) + " m²";
+            ui.statCap.innerText = Math.floor(capacity) + " ppl";
+
+            draw();
+        }
+
+        function resize() {
+            canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+            if (!view.initialized) { view.offsetX = canvas.width * 0.75; view.offsetY = canvas.height / 2; view.initialized = true; }
+            draw();
+        }
+
+        function draw() {
+            if (canvas.width === 0) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const toScr = (x, y) => ({ x: view.offsetX + (x * state.scale), y: view.offsetY + (y * state.scale) });
+            const PW = state.prosWidth;
+            const P_Dist = state.pRatio * PW; 
+            const D = state.depth30;
+            const sD = state.stageDepth;
+
+            const oTop = toScr(0, -PW/2); 
+            const oBot = toScr(0, PW/2);
+
+            // --- LAYER 0: BLIND SPOT HATCH ---
+            const intersectY = (PW / 2) * ((P_Dist - sD) / P_Dist);
+            ctx.fillStyle = getHatchPattern();
+            
+            ctx.beginPath();
+            ctx.moveTo(toScr(0, -PW/2).x, toScr(0, -PW/2).y); 
+            ctx.lineTo(toScr(sD, -PW/2).x, toScr(sD, -PW/2).y); 
+            ctx.lineTo(toScr(sD, -intersectY).x, toScr(sD, -intersectY).y); 
+            ctx.closePath(); ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(toScr(0, PW/2).x, toScr(0, PW/2).y);
+            ctx.lineTo(toScr(sD, PW/2).x, toScr(sD, PW/2).y);
+            ctx.lineTo(toScr(sD, intersectY).x, toScr(sD, intersectY).y);
+            ctx.closePath(); ctx.fill();
+
+            // --- LAYER 1: STAGE ---
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([6, 6]);
+            ctx.beginPath(); ctx.moveTo(oTop.x, oTop.y); ctx.lineTo(oBot.x, oBot.y); ctx.stroke(); ctx.setLineDash([]);
+            
+            const sTopR = toScr(sD, -PW/2); const sBotR = toScr(sD, PW/2);
+            ctx.strokeStyle = '#444'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(oTop.x, oTop.y); ctx.lineTo(sTopR.x, sTopR.y); ctx.lineTo(sBotR.x, sBotR.y); ctx.lineTo(oBot.x, oBot.y); ctx.stroke();
+
+            // --- POINT P ---
+            const pPos = toScr(P_Dist, 0);
+            ctx.fillStyle = '#2196F3'; 
+            ctx.beginPath(); ctx.arc(pPos.x, pPos.y, 6, 0, Math.PI*2); ctx.fill();
+            ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'left';
+            ctx.fillText("Point P", pPos.x + 18, pPos.y + 5); 
+
+            // --- LAYER 2: WALLS & A-D LABELS ---
+            const backHalfWidth = calcRowHalfWidth(D, P_Dist, PW);
+            const frontHalfWidth = calcRowHalfWidth(state.dist110, P_Dist, PW);
+            
+            const backTop = toScr(-D, -backHalfWidth);      // Point A
+            const backBot = toScr(-D, backHalfWidth);       // Point D
+            const frontTop = toScr(-state.dist110, -frontHalfWidth); // Point B
+            const frontBot = toScr(-state.dist110, frontHalfWidth);  // Point C
+            
+            // Draw Blue Walls
+            ctx.strokeStyle = '#2196F3'; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(pPos.x, pPos.y); ctx.lineTo(backTop.x, backTop.y);
+            ctx.moveTo(pPos.x, pPos.y); ctx.lineTo(backBot.x, backBot.y); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(backTop.x, backTop.y); ctx.lineTo(backBot.x, backBot.y); ctx.stroke();
+
+            // --- DRAW A, B, C, D ---
+            ctx.fillStyle = '#ff5252'; 
+            ctx.font = 'bold 20px sans-serif';
+            
+            ctx.textAlign = 'right';
+            ctx.fillText("A", backTop.x - 15, backTop.y); 
+            
+            ctx.textAlign = 'left';
+            ctx.fillText("B", frontTop.x + 15, frontTop.y - 10); 
+            ctx.fillText("C", frontBot.x + 15, frontBot.y + 20); 
+            
+            ctx.textAlign = 'right';
+            ctx.fillText("D", backBot.x - 15, backBot.y + 10); 
+
+            // --- LAYER 2.5: CONCENTRIC ARCS (OVERLAY) ---
+            if(state.overlay === 'arcs') {
+                ctx.save();
+                
+                // --- CLIPPING PATH ---
+                // We clip to the triangle defined by Point P and the two back corners (A and D).
+                // This ensures the arcs are bounded by the side walls.
+                // We don't clip the front edge because curved rows inherently curve forward into the 'pit'
+                // relative to straight rows, and we want to visualize that curvature.
+                ctx.beginPath();
+                ctx.moveTo(pPos.x, pPos.y);
+                ctx.lineTo(backTop.x, backTop.y);
+                ctx.lineTo(backBot.x, backBot.y);
+                ctx.closePath();
+                ctx.clip();
+
+                // Determine Angles from P to Proscenium Edges for optimized drawing range
+                const angleTop = Math.atan2(-PW/2, -P_Dist);
+                const angleBot = Math.atan2(PW/2, -P_Dist);
+
+                // Determine Radii
+                // Start exactly at First Row distance
+                const rStart = P_Dist + state.dist110;
+                const rEnd = P_Dist + state.depth30; // End at back wall
+
+                ctx.strokeStyle = 'rgba(255, 202, 40, 0.8)'; // Amber color, visible against dark bg
+                ctx.lineWidth = 1.5;
+                
+                for(let r = rStart; r <= rEnd; r += 1.2) {
+                    ctx.beginPath();
+                    // Draw arc centered at P. We use a wide angle range; the clip() handles the cut.
+                    ctx.arc(pPos.x, pPos.y, r * state.scale, angleTop - 0.5, angleBot + 0.5);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // --- LAYER 3: STRAIGHT ROWS ---
+            const rows = [
+                { d: 110, dist: state.dist110, l: "First Row" }, 
+                { d: 60, dist: state.dist60, l: "Middle" }, 
+                { d: 30, dist: state.depth30, l: "Last Row" }
+            ];
+            
+            rows.forEach(r => {
+                const hW = calcRowHalfWidth(r.dist, P_Dist, PW);
+                const pStart = toScr(-r.dist, -hW);
+                const pEnd = toScr(-r.dist, hW);
+                const pCenter = toScr(-r.dist, 0);
+
+                ctx.strokeStyle = '#ff5252'; 
+                ctx.lineWidth = 2; 
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath(); 
+                ctx.moveTo(pStart.x, pStart.y); 
+                ctx.lineTo(pEnd.x, pEnd.y); 
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.strokeStyle = '#ff5252'; ctx.lineWidth = 1; ctx.globalAlpha = 0.4;
+                ctx.beginPath(); 
+                ctx.moveTo(pCenter.x, pCenter.y); ctx.lineTo(oTop.x, oTop.y);
+                ctx.moveTo(pCenter.x, pCenter.y); ctx.lineTo(oBot.x, oBot.y);
+                ctx.stroke(); ctx.globalAlpha = 1.0;
+
+                // Labels
+                ctx.fillStyle = '#ff5252'; 
+                ctx.font = 'bold 16px sans-serif'; 
+                ctx.textAlign = 'left'; 
+                ctx.fillText(r.d + "°", pCenter.x + 12, pCenter.y + 6);
+                
+                ctx.fillStyle = '#ccc'; 
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'right'; 
+                ctx.fillText(r.l, pCenter.x - 8, pCenter.y - 10); 
+                
+                ctx.fillStyle = '#888'; 
+                ctx.font = '14px sans-serif'; 
+                ctx.fillText(r.dist.toFixed(1) + "m", pCenter.x - 8, pCenter.y + 12);
+            });
+
+            // --- LAYER 4: PROBE MODE ---
+            if (state.tool === 'probe') {
+                const mPos = { x: mouse.x, y: mouse.y };
+                
+                ctx.strokeStyle = '#4CAF50'; 
+                ctx.setLineDash([4, 4]);
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(mPos.x, mPos.y); ctx.lineTo(oTop.x, oTop.y);
+                ctx.moveTo(mPos.x, mPos.y); ctx.lineTo(oBot.x, oBot.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                ctx.strokeStyle = 'rgba(76, 175, 80, 0.3)';
+                ctx.beginPath(); ctx.moveTo(oTop.x, oTop.y); ctx.lineTo(oBot.x, oBot.y); ctx.stroke();
+            }
+        }
+
+        // --- EVENTS ---
+        toolRadios.forEach(rb => {
+            rb.addEventListener('change', (e) => {
+                state.tool = e.target.value;
+                if(state.tool === 'probe') {
+                    container.style.cursor = 'crosshair';
+                    tooltip.style.display = 'block';
+                } else {
+                    container.style.cursor = 'grab';
+                    tooltip.style.display = 'none';
+                }
+                draw();
+            });
+        });
+
+        overlayRadios.forEach(rb => {
+            rb.addEventListener('change', (e) => {
+                state.overlay = e.target.value;
+                draw();
+            });
+        });
+
+        let isDrag = false, lastPos = {x:0, y:0};
+        container.addEventListener('mousedown', e => { 
+            if(state.tool === 'nav') { isDrag = true; lastPos = {x:e.clientX, y:e.clientY}; container.style.cursor = 'grabbing'; }
+        });
+        window.addEventListener('mouseup', () => { isDrag = false; if(state.tool === 'nav') container.style.cursor = 'grab'; });
+
+        window.addEventListener('mousemove', e => { 
+            mouse.x = e.clientX; mouse.y = e.clientY;
+            if(isDrag && state.tool === 'nav') {
+                view.offsetX += e.clientX - lastPos.x; view.offsetY += e.clientY - lastPos.y; lastPos = {x:e.clientX, y:e.clientY}; 
+            }
+            if(state.tool === 'probe') {
+                const worldX = (mouse.x - view.offsetX) / state.scale;
+                const worldY = (mouse.y - view.offsetY) / state.scale;
+                const dx1 = 0 - worldX; const dy1 = (-state.prosWidth/2) - worldY;
+                const dx2 = 0 - worldX; const dy2 = (state.prosWidth/2) - worldY;
+                const dot = dx1*dx2 + dy1*dy2;
+                const mag1 = Math.sqrt(dx1*dx1 + dy1*dy1); const mag2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+                let angleRad = Math.acos(dot / (mag1 * mag2));
+                let angleDeg = (angleRad * 180 / Math.PI).toFixed(1);
+                if(isNaN(angleDeg)) angleDeg = "180.0";
+                tooltip.innerText = `View Angle: ${angleDeg}°`;
+                tooltip.style.left = (e.clientX + 15) + 'px'; tooltip.style.top = (e.clientY + 15) + 'px';
+            }
+            draw(); 
+        });
+
+        ui.pros.addEventListener('input', updateCalculations);
+        ui.depth.addEventListener('input', updateCalculations);
+        ui.ratio.addEventListener('input', updateCalculations);
+        container.addEventListener('wheel', e => { e.preventDefault(); state.scale = Math.max(2, Math.min(state.scale * (1 - e.deltaY * 0.001), 100)); draw(); }, { passive: false });
+        window.addEventListener('resize', resize);
+        
+        resize(); updateCalculations();
+    </script>
+</body>
+</html>
