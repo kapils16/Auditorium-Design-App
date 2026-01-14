@@ -42,12 +42,17 @@ This tool assists in defining the horizontal limits of an auditorium based on th
 * **Pan:** Click and drag the canvas to move around.
 * **Zoom:** Use the mouse wheel to zoom in/out.
 * **Probe:** Switch the "Mouse Tool" to "Angle Probe" to inspect specific viewing angles.
+  
+  <img width="1912" height="1022" alt="image" src="https://github.com/user-attachments/assets/98a60d6d-7678-47f0-85e5-fec54a0a54b6" />
+  Screenshot of the Auditorium Proportions Calculator
+
 
 ---
 
 ## 📐 Tool 2: Auditorium Section Optimizer (Rake Calculator)
 
 **Filename:** `AuditoriumRakeCalculator.html`
+
 
 This tool calculates the vertical "Rake" (slope) of the seating tiers. It ensures that every spectator has a clear sightline over the head of the person in front of them to the focal point on stage.
 
@@ -76,6 +81,10 @@ This tool calculates the vertical "Rake" (slope) of the seating tiers. It ensure
 
 * **Pan:** Click and drag to move the section view.
 * **Zoom:** Mouse wheel to inspect riser details.
+
+  <img width="1907" height="1027" alt="image" src="https://github.com/user-attachments/assets/be1b8712-b49d-4316-a19b-8bc3f43a641d" />
+  Screenshot of Rake Calculator
+
 
 ---
 
